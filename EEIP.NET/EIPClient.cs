@@ -517,14 +517,37 @@ namespace Sres.Net.EEIP
             while (itemCount > 2)
             {
                 int typeID = data[40 + lengthUnconectedDataItem+ 20 * numberOfCurrentItem] + (data[40 + lengthUnconectedDataItem + 1+ 20 * numberOfCurrentItem] << 8);
-                if (typeID == 0x8001)
+                if (typeID == 0x8001)   //Sockaddr Info, target-to-originator 
                 {
                     socketInfoItem = new Encapsulation.SocketAddress();
                     socketInfoItem.SIN_Address = (UInt32)(data[40 + lengthUnconectedDataItem + 8 + 20 * numberOfCurrentItem]) + (UInt32)(data[40 + lengthUnconectedDataItem + 9 + 20 * numberOfCurrentItem] << 8) + (UInt32)(data[40 + lengthUnconectedDataItem + 10 + 20 * numberOfCurrentItem] << 16) + (UInt32)(data[40 + lengthUnconectedDataItem + 11 + 20 * numberOfCurrentItem] << 24);
                     socketInfoItem.SIN_port = (UInt16)((UInt16)(data[40 + lengthUnconectedDataItem + 7 + 20 * numberOfCurrentItem]) + (UInt16)(data[40 + lengthUnconectedDataItem + 6 + 20 * numberOfCurrentItem] << 8));
                     if (T_O_ConnectionType == ConnectionType.Multicast)
                         multicastAddress = socketInfoItem.SIN_Address;
-                    TargetUDPPort = socketInfoItem.SIN_port;
+                    OriginatorUDPPort = socketInfoItem.SIN_port;    // Update our Originator Port as fallback in case target do not use specified port
+
+                 /*   Console.WriteLine("socketInfoItem T->O : " + (data[40 + lengthUnconectedDataItem + 8 + 20 * numberOfCurrentItem]).ToString() + "."
+                        + (data[40 + lengthUnconectedDataItem + 9 + 20 * numberOfCurrentItem]).ToString() + "."
+                        + (data[40 + lengthUnconectedDataItem + 10 + 20 * numberOfCurrentItem]).ToString() + "."
+                        + (data[40 + lengthUnconectedDataItem + 11 + 20 * numberOfCurrentItem]).ToString() + ":" 
+                        + (UInt16)((UInt16)(data[40 + lengthUnconectedDataItem + 7 + 20 * numberOfCurrentItem]) + (UInt16)(data[40 + lengthUnconectedDataItem + 6 + 20 * numberOfCurrentItem] << 8))
+                        );*/
+                }
+                if (typeID == 0x8000)  
+                {
+                    socketInfoItem = new Encapsulation.SocketAddress();
+                    socketInfoItem.SIN_Address = (UInt32)(data[40 + lengthUnconectedDataItem + 8 + 20 * numberOfCurrentItem]) + (UInt32)(data[40 + lengthUnconectedDataItem + 9 + 20 * numberOfCurrentItem] << 8) + (UInt32)(data[40 + lengthUnconectedDataItem + 10 + 20 * numberOfCurrentItem] << 16) + (UInt32)(data[40 + lengthUnconectedDataItem + 11 + 20 * numberOfCurrentItem] << 24);
+                    socketInfoItem.SIN_port = (UInt16)((UInt16)(data[40 + lengthUnconectedDataItem + 7 + 20 * numberOfCurrentItem]) + (UInt16)(data[40 + lengthUnconectedDataItem + 6 + 20 * numberOfCurrentItem] << 8));
+                    if (T_O_ConnectionType == ConnectionType.Multicast)
+                        multicastAddress = socketInfoItem.SIN_Address;
+                    TargetUDPPort = socketInfoItem.SIN_port;    // Update Target Port if not default value
+
+                 /*   Console.WriteLine("socketInfoItem O->T : " + (data[40 + lengthUnconectedDataItem + 8 + 20 * numberOfCurrentItem]).ToString() + "."
+                        + (data[40 + lengthUnconectedDataItem + 9 + 20 * numberOfCurrentItem]).ToString() + "."
+                        + (data[40 + lengthUnconectedDataItem + 10 + 20 * numberOfCurrentItem]).ToString() + "."
+                        + (data[40 + lengthUnconectedDataItem + 11 + 20 * numberOfCurrentItem]).ToString() + ":" 
+                        + (UInt16)((UInt16)(data[40 + lengthUnconectedDataItem + 7 + 20 * numberOfCurrentItem]) + (UInt16)(data[40 + lengthUnconectedDataItem + 6 + 20 * numberOfCurrentItem] << 8))
+                        );*/
                 }
                 numberOfCurrentItem++;
                 itemCount--;

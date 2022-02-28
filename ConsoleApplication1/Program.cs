@@ -12,42 +12,7 @@ namespace ConsoleApplication1
         static void Main(string[] args)
         {
 
-            Encapsulation.CommonPacketFormat commonPacketFormat = new Encapsulation.CommonPacketFormat();
 
-            //----------------O->T Network Connection Parameters
-            bool redundantOwner = (bool)true;
-            byte connectionType = (byte)2; //1=Multicast, 2=P2P
-            byte priority = (byte)10;         //00=low; 01=High; 10=Scheduled; 11=Urgent
-            bool variableLength = false;       //0=fixed; 1=variable
-            UInt16 O_T_Length = 256;
-            Console.WriteLine("O_T_Length: " + (O_T_Length).ToString());
-            UInt16 connectionSize = (ushort)(O_T_Length);      //The maximum size in bytes og the data for each direction (were applicable) of the connection. For a variable -> maximum
-            Console.WriteLine("connectionSize: " + (connectionSize).ToString());
-            UInt32 NetworkConnectionParameters;
-            NetworkConnectionParameters = (UInt16)(connectionSize & 0x1FF);
-            Console.WriteLine("NetworkConnectionParameters: " + (NetworkConnectionParameters).ToString());
-
-            NetworkConnectionParameters = (UInt16)((UInt16)(connectionSize & 0x1FF) | ((Convert.ToUInt16(variableLength)) << 9));
-            Console.WriteLine("NetworkConnectionParameters <<9: " + (NetworkConnectionParameters).ToString());
-            Console.WriteLine("NetworkConnectionParameters byte: " + ((byte)NetworkConnectionParameters).ToString());
-            Console.WriteLine("NetworkConnectionParameters byte >>8: " + ((byte)(NetworkConnectionParameters >> 8)).ToString());
-            commonPacketFormat.Data.Add((byte)NetworkConnectionParameters);
-            commonPacketFormat.Data.Add((byte)(NetworkConnectionParameters >> 8));
-
-            Console.WriteLine("commonPacketFormat.Data[0]: " + ((byte)commonPacketFormat.Data[0]).ToString());
-            Console.WriteLine("commonPacketFormat.Data[1]: " + ((byte)commonPacketFormat.Data[1]).ToString());
-
-            NetworkConnectionParameters = (UInt16)((UInt16)(connectionSize & 0x1FF) | ((Convert.ToUInt16(variableLength)) << 9) | ((priority & 0x03) << 10) | ((connectionType & 0x03) << 13) | ((Convert.ToUInt16(redundantOwner)) << 15));
-            commonPacketFormat.Data.Add((byte)NetworkConnectionParameters);
-            commonPacketFormat.Data.Add((byte)(NetworkConnectionParameters >> 8));
-
-            byte[] dataToWrite = new byte[commonPacketFormat.toBytes().Length];
-            System.Buffer.BlockCopy(commonPacketFormat.toBytes(), 0, dataToWrite, 0, commonPacketFormat.toBytes().Length);
-
-            for (int i = 0; i < dataToWrite.Length; i++)
-            {
-                Console.WriteLine("dataToWrite["+i+"]: " + ((byte)dataToWrite[i]).ToString());
-            }
 
 
             EEIPClient eeipClient = new EEIPClient();

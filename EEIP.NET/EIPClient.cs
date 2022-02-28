@@ -92,11 +92,11 @@ namespace Sres.Net.EEIP
         /// <summary>
         /// Class Assembly (Consuming IO-Path - Outputs) Originator -> Target for Implicit Messaging (Default: 0x64)
         /// </summary>
-        public byte O_T_InstanceID { get; set; } = 0x64;               //Ausgänge
+        public UInt16 O_T_InstanceID { get; set; } = 0x64;               //Ausgänge
         /// <summary>
-        /// Class Assembly (Producing IO-Path - Inputs) Target -> Originator for Implicit Messaging (Default: 0x64)
+        /// Class Assembly (Producing IO-Path - Inputs) Target -> Originator for Implicit Messaging (Default: 0x65)
         /// </summary>
-        public byte T_O_InstanceID { get; set; } = 0x65;               //Eingänge
+        public UInt16 T_O_InstanceID { get; set; } = 0x65;               //Eingänge
         /// <summary>
         /// Provides Access to the Class 1 Real-Time IO-Data Originator -> Target for Implicit Messaging    
         /// </summary>
@@ -124,7 +124,7 @@ namespace Sres.Net.EEIP
         /// <summary>
         /// ConfigurationAssemblyInstanceID is the InstanceID of the configuration Instance in the Assembly Object Class (Standard: 0x01)
         /// </summary>
-        public byte ConfigurationAssemblyInstanceID { get; set; } = 0x01;
+        public UInt16 ConfigurationAssemblyInstanceID { get; set; } = 0x01;
         /// <summary>
         /// Returns the Date and Time when the last Implicit Message has been received fŕom The Target Device
         /// Could be used to determine a Timeout
@@ -293,7 +293,7 @@ namespace Sres.Net.EEIP
             if (T_O_RealTimeFormat == RealTimeFormat.Heartbeat)
                 t_o_headerOffset = 0;
 
-            int lengthOffset = (5 + (O_T_ConnectionType == ConnectionType.Null ? 0 : 2) + (T_O_ConnectionType == ConnectionType.Null ? 0 : 2));
+            byte[] requestedPath = GetEPath(AssemblyObjectClass, ConfigurationAssemblyInstanceID, O_T_InstanceID, T_O_InstanceID, 0);
 
             Encapsulation encapsulation = new Encapsulation();
             encapsulation.SessionHandle = sessionHandle;
@@ -321,7 +321,7 @@ namespace Sres.Net.EEIP
 
             
             commonPacketFormat.DataItem = 0xB2;
-            commonPacketFormat.DataLength = (ushort)(41 + (ushort)lengthOffset);
+            commonPacketFormat.DataLength = (ushort)(42 + (ushort)requestedPath.Length);
             if (largeForwardOpen)
                 commonPacketFormat.DataLength = (ushort)(commonPacketFormat.DataLength + 4);
 
@@ -410,7 +410,7 @@ namespace Sres.Net.EEIP
             byte connectionType = (byte)O_T_ConnectionType; //1=Multicast, 2=P2P
             byte priority = (byte)O_T_Priority;         //00=low; 01=High; 10=Scheduled; 11=Urgent
             bool variableLength = O_T_VariableLength;       //0=fixed; 1=variable
-            UInt16 connectionSize = (ushort)(O_T_Length + o_t_headerOffset);      //The maximum size in bytes og the data for each direction (were applicable) of the connection. For a variable -> maximum
+            UInt16 connectionSize = (UInt16)(O_T_Length + (UInt16)o_t_headerOffset);      //The maximum size in bytes og the data for each direction (were applicable) of the connection. For a variable -> maximum
             UInt32 NetworkConnectionParameters = (UInt16)((UInt16)(connectionSize & 0x1FF) | ((Convert.ToUInt16(variableLength)) << 9) | ((priority & 0x03) << 10) | ((connectionType & 0x03) << 13) | ((Convert.ToUInt16(redundantOwner)) << 15));
             if (largeForwardOpen)
                 NetworkConnectionParameters = (UInt32)((uint)(connectionSize & 0xFFFF) | ((Convert.ToUInt32(variableLength)) << 25) | (uint)((priority & 0x03) << 26) | (uint)((connectionType & 0x03) << 29) | ((Convert.ToUInt32(redundantOwner)) << 31));
@@ -437,7 +437,7 @@ namespace Sres.Net.EEIP
             connectionType = (byte)T_O_ConnectionType; //1=Multicast, 2=P2P
             priority = (byte)T_O_Priority;
             variableLength = T_O_VariableLength;
-            connectionSize = (byte)(T_O_Length  + t_o_headerOffset);
+            connectionSize = Convert.ToUInt16(T_O_Length + t_o_headerOffset);
             NetworkConnectionParameters = (UInt16)((UInt16)(connectionSize & 0x1FF) | ((Convert.ToUInt16(variableLength)) << 9) | ((priority & 0x03) << 10) | ((connectionType & 0x03) << 13) | ((Convert.ToUInt16(redundantOwner)) << 15));
             if (largeForwardOpen)
                 NetworkConnectionParameters = (UInt32)((uint)(connectionSize & 0xFFFF) | ((Convert.ToUInt32(variableLength)) << 25) | (uint)((priority & 0x03) << 26) | (uint)((connectionType & 0x03) << 29) | ((Convert.ToUInt32(redundantOwner)) << 31));
@@ -456,22 +456,12 @@ namespace Sres.Net.EEIP
             //-XXX---- = Production Trigger, 0 = Cyclic, 1 = CoS, 2 = Application Object
             //----XXXX = Transport class, 0 = Class 0, 1 = Class 1, 2 = Class 2, 3 = Class 3
             //----------------Transport Type Trigger
-            //Connection Path size 
-            commonPacketFormat.Data.Add((byte)((0x2) + (O_T_ConnectionType == ConnectionType.Null ? 0 : 1) + (T_O_ConnectionType == ConnectionType.Null ? 0 : 1) ));
+            //Connection Path size (number of 16 bit words)
+            commonPacketFormat.Data.Add((byte)(requestedPath.Length/2));
             //Verbindugspfad
-            commonPacketFormat.Data.Add((byte)(0x20));
-            commonPacketFormat.Data.Add((byte)(AssemblyObjectClass));
-            commonPacketFormat.Data.Add((byte)(0x24));
-            commonPacketFormat.Data.Add((byte)(ConfigurationAssemblyInstanceID));
-            if (O_T_ConnectionType != ConnectionType.Null)
+            for (int i = 0; i < requestedPath.Length; i++)
             {
-                commonPacketFormat.Data.Add((byte)(0x2C));
-                commonPacketFormat.Data.Add((byte)(O_T_InstanceID));
-            }
-            if (T_O_ConnectionType != ConnectionType.Null)
-            {
-                commonPacketFormat.Data.Add((byte)(0x2C));
-                commonPacketFormat.Data.Add((byte)(T_O_InstanceID));
+                commonPacketFormat.Data.Add(requestedPath[i]);
             }
             
             //AddSocket Addrress Item O->T
@@ -634,13 +624,12 @@ namespace Sres.Net.EEIP
 
             stopUDP = true;
 
-
-            int lengthOffset = (5 + (O_T_ConnectionType == ConnectionType.Null ? 0 : 2) + (T_O_ConnectionType == ConnectionType.Null ? 0 : 2));
+            byte[] requestedPath = GetEPath(AssemblyObjectClass, ConfigurationAssemblyInstanceID, O_T_InstanceID, T_O_InstanceID, 0);
 
             Encapsulation encapsulation = new Encapsulation();
             encapsulation.SessionHandle = sessionHandle;
             encapsulation.Command = Encapsulation.CommandsEnum.SendRRData;
-            encapsulation.Length = (ushort)(16 +17+ (ushort)lengthOffset);
+            encapsulation.Length = (ushort)(16 +18+ (ushort)requestedPath.Length);
             //---------------Interface Handle CIP
             encapsulation.CommandSpecificData.Add(0);
             encapsulation.CommandSpecificData.Add(0);
@@ -662,7 +651,7 @@ namespace Sres.Net.EEIP
 
 
             commonPacketFormat.DataItem = 0xB2;
-            commonPacketFormat.DataLength = (ushort)(17 + (ushort)lengthOffset);
+            commonPacketFormat.DataLength = (ushort)(18 + (ushort)requestedPath.Length);
 
 
 
@@ -709,27 +698,16 @@ namespace Sres.Net.EEIP
             commonPacketFormat.Data.Add(0xFF);
             //----------------Originator Serial Number
 
-            //Connection Path size 
-            commonPacketFormat.Data.Add((byte)((0x2) + (O_T_ConnectionType == ConnectionType.Null ? 0 : 1) + (T_O_ConnectionType == ConnectionType.Null ? 0 : 1)));
+            //Connection Path size (number of 16 bit words)
+            commonPacketFormat.Data.Add((byte)(requestedPath.Length / 2));
             //Reserved
             commonPacketFormat.Data.Add(0);
             //Reserved
 
-
             //Verbindugspfad
-            commonPacketFormat.Data.Add((byte)(0x20));
-            commonPacketFormat.Data.Add(AssemblyObjectClass);
-            commonPacketFormat.Data.Add((byte)(0x24));
-            commonPacketFormat.Data.Add((byte)(ConfigurationAssemblyInstanceID));
-            if (O_T_ConnectionType != ConnectionType.Null)
+            for (int i = 0; i < requestedPath.Length; i++)
             {
-                commonPacketFormat.Data.Add((byte)(0x2C));
-                commonPacketFormat.Data.Add((byte)(O_T_InstanceID));
-            }
-            if (T_O_ConnectionType != ConnectionType.Null)
-            {
-                commonPacketFormat.Data.Add((byte)(0x2C));
-                commonPacketFormat.Data.Add((byte)(T_O_InstanceID));
+                commonPacketFormat.Data.Add(requestedPath[i]);
             }
 
             byte[] dataToWrite = new byte[encapsulation.toBytes().Length + commonPacketFormat.toBytes().Length];
@@ -740,7 +718,7 @@ namespace Sres.Net.EEIP
             {
                 stream.Write(dataToWrite, 0, dataToWrite.Length);
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 //Handle Exception  to allow Forward close if the connection was closed by the Remote Device before
             }
@@ -750,7 +728,7 @@ namespace Sres.Net.EEIP
             {
                 Int32 bytes = stream.Read(data, 0, data.Length);
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 //Handle Exception  to allow Forward close if the connection was closed by the Remote Device before
             }
@@ -762,14 +740,9 @@ namespace Sres.Net.EEIP
                 throw new CIPException(GeneralStatusCodes.GetStatusCode(data[42]));
             }
 
-
             //Close the Socket for Receive
             udpClientReceiveClosed = true;
             udpClientReceive.Close();
-  
-           
-
-
         }
 
         private bool stopUDP;
@@ -1204,72 +1177,94 @@ namespace Sres.Net.EEIP
         /// <returns>Encrypted Request Path</returns>
         private byte[] GetEPath(int classID, int instanceID, int attributeID)
         {
-            int byteCount = 0;
+            return GetEPath(classID, instanceID, 0, 0, attributeID);
+        }
+        /// <summary>
+        /// Get the Encrypted Request Path - See Volume 1 Appendix C (C9)
+        /// e.g. for 8 Bit: 20 05 24 02 30 01
+        /// for 16 Bit: 21 00 05 00 24 02 30 01
+        /// eg for Forward Open EPath 20 04 24 01 2C 02 2C 03
+        /// </summary>
+        /// <param name="classID">Requested Class ID</param>
+        /// <param name="configID">Requested Configuration ID</param>
+        /// <param name="consumingID">Requested Consuming ID  - if "0" will be ignored</param>
+        /// <param name="producingID">Requested Producing ID  - if "0" will be ignored</param>
+        /// <param name="attributeID">Requested Attribute ID - if "0" the attribute will be ignored</param>
+        /// <returns>Encrypted Request Path</returns>
+        private byte[] GetEPath(int classID, int configID, int consumingID, int producingID, int attributeID)
+        {
+            List<byte> data = new List<byte>();
+
             if (classID < 0xff)
-                byteCount = byteCount + 2;
-            else
-                byteCount = byteCount + 4;
-           
-            if (instanceID < 0xff)
-                byteCount = byteCount + 2;
-            else
-                byteCount = byteCount + 4;
-            if (attributeID != 0)
-                if (attributeID < 0xff)
-                    byteCount = byteCount + 2;
-                else
-                    byteCount = byteCount + 4;
-
-            byte[] returnValue = new byte[byteCount];
-            byteCount = 0;
-            if (classID < 0xff)
             {
-                returnValue[byteCount] = 0x20;
-                returnValue[byteCount+1] = (byte)classID;
-                byteCount = byteCount + 2;
+                data.Add(0x20);
+                data.Add((byte)classID);
             }
             else
             {
-                returnValue[byteCount] = 0x21;
-                returnValue[byteCount + 1] = 0;                             //Padded Byte
-                returnValue[byteCount + 2] = (byte)classID;                 //LSB
-                returnValue[byteCount + 3] = (byte)(classID>>8);            //MSB
-                byteCount = byteCount + 4;
+                data.Add(0x21);
+                data.Add(0x0);                          //Padded Byte
+                data.Add((byte)classID);                //LSB
+                data.Add((byte)(classID>>8));           //MSB
             }
 
 
-            if (instanceID < 0xff)
+            if (configID < 0xff)
             {
-                returnValue[byteCount] = 0x24;
-                returnValue[byteCount + 1] = (byte)instanceID;
-                byteCount = byteCount + 2;
+                data.Add(0x24);
+                data.Add((byte)configID);
             }
             else
             {
-                returnValue[byteCount] = 0x25;
-                returnValue[byteCount + 1] = 0;                                //Padded Byte
-                returnValue[byteCount + 2] = ((byte)instanceID);                 //LSB
-                returnValue[byteCount + 3] = (byte)(instanceID >> 8);          //MSB
-                byteCount = byteCount + 4;
+                data.Add(0x25);
+                data.Add(0x0);                        //Padded Byte
+                data.Add((byte)configID);             //LSB
+                data.Add((byte)(configID >> 8));      //MSB
             }
-            if (attributeID != 0)
-                if (attributeID < 0xff)
+
+            if (consumingID != 0)
+                if (consumingID < 0xff)
                 {
-                    returnValue[byteCount] = 0x30;
-                    returnValue[byteCount + 1] = (byte)attributeID;
-                    byteCount = byteCount + 2;
+                    data.Add(0x2C);
+                    data.Add((byte)consumingID);
                 }
                 else
                 {
-                    returnValue[byteCount] = 0x31;
-                    returnValue[byteCount + 1] = 0;                                 //Padded Byte
-                    returnValue[byteCount + 2] = (byte)attributeID;                 //LSB
-                    returnValue[byteCount + 3] = (byte)(attributeID >> 8);          //MSB
-                    byteCount = byteCount + 4;
+                    data.Add(0x2D);
+                    data.Add(0x0);                        //Padded Byte
+                    data.Add((byte)consumingID);             //LSB
+                    data.Add((byte)(consumingID >> 8));      //MSB
                 }
 
-            return returnValue;
+            if (producingID != 0)
+                if (producingID < 0xff)
+                {
+                    data.Add(0x2C);
+                    data.Add((byte)producingID);
+                }
+                else
+                {
+                    data.Add(0x2D);
+                    data.Add(0x0);                        //Padded Byte
+                    data.Add((byte)producingID);             //LSB
+                    data.Add((byte)(producingID >> 8));      //MSB
+                }
 
+            if (attributeID != 0)
+                if (attributeID < 0xff)
+                {
+                    data.Add(0x30);
+                    data.Add((byte)attributeID);
+                }
+                else
+                {
+                    data.Add(0x31);
+                    data.Add(0x0);                           //Padded Byte
+                    data.Add((byte)attributeID);             //LSB
+                    data.Add((byte)(attributeID >> 8));      //MSB
+                }
+
+            return data.ToArray();
         }
 
         /// <summary>
@@ -1339,7 +1334,6 @@ namespace Sres.Net.EEIP
 
             }
         }
-
 
         /// <summary>
         /// Provides Access to the Class 1 Real-Time IO-Data Originator -> Target for Implicit Messaging    

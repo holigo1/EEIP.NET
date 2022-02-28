@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Sres.Net.EEIP
 {
@@ -101,12 +99,12 @@ namespace Sres.Net.EEIP
         /// Provides Access to the Class 1 Real-Time IO-Data Originator -> Target for Implicit Messaging    
         /// </summary>
         private byte[] _O_T_IOData = new byte[505];   //Class 1 Real-Time IO-Data O->T   
-        private object _O_T_IOData_lock = new object();
+        private readonly object _O_T_IOData_lock = new object();
         /// <summary>
         /// Provides Access to the Class 1 Real-Time IO-Data Target -> Originator for Implicit Messaging
         /// </summary>
-        private byte[] _T_O_IOData = new byte[505];    //Class 1 Real-Time IO-Data T->O  
-		private object _T_O_IOData_lock = new object();											   
+        private byte[] _T_O_IOData = new byte[505];    //Class 1 Real-Time IO-Data T->O 
+        private readonly object _T_O_IOData_lock = new object();
         /// <summary>
         /// Used Real-Time Format Originator -> Target for Implicit Messaging (Default: RealTimeFormat.Header32Bit)
         /// Possible Values: RealTimeFormat.Header32Bit; RealTimeFormat.Heartbeat; RealTimeFormat.ZeroLength; RealTimeFormat.Modeless
@@ -195,7 +193,7 @@ namespace Sres.Net.EEIP
 
                             byte[] sendData = new byte[24];
                             sendData[0] = 0x63;               //Command for "ListIdentity"
-                            System.Net.Sockets.UdpClient udpClient = new System.Net.Sockets.UdpClient();
+                            UdpClient udpClient = new System.Net.Sockets.UdpClient();
                             System.Net.IPEndPoint endPoint = new System.Net.IPEndPoint(System.Net.IPAddress.Parse(multicastAddress), 44818);
                             udpClient.Send(sendData, sendData.Length, endPoint);
 
@@ -437,7 +435,7 @@ namespace Sres.Net.EEIP
             connectionType = (byte)T_O_ConnectionType; //1=Multicast, 2=P2P
             priority = (byte)T_O_Priority;
             variableLength = T_O_VariableLength;
-            connectionSize = Convert.ToUInt16(T_O_Length + t_o_headerOffset);
+            connectionSize = Convert.ToUInt16(T_O_Length + t_o_headerOffset); //connectionSize = (UInt16)(T_O_Length  + (UInt16)t_o_headerOffset);
             NetworkConnectionParameters = (UInt16)((UInt16)(connectionSize & 0x1FF) | ((Convert.ToUInt16(variableLength)) << 9) | ((priority & 0x03) << 10) | ((connectionType & 0x03) << 13) | ((Convert.ToUInt16(redundantOwner)) << 15));
             if (largeForwardOpen)
                 NetworkConnectionParameters = (UInt32)((uint)(connectionSize & 0xFFFF) | ((Convert.ToUInt32(variableLength)) << 25) | (uint)((priority & 0x03) << 26) | (uint)((connectionType & 0x03) << 29) | ((Convert.ToUInt32(redundantOwner)) << 31));
@@ -766,6 +764,7 @@ namespace Sres.Net.EEIP
             //Close the Socket for Receive
             udpClientReceiveClosed = true;
             udpClientReceive.Close();
+
         }
 
         private bool stopUDP;
@@ -850,7 +849,7 @@ namespace Sres.Net.EEIP
                 }
 
                 //---------------Write data
-				lock (_O_T_IOData_lock)
+                lock (_O_T_IOData_lock)
                 {
                     Array.Copy(_O_T_IOData, 0, o_t_IOData, 20 + headerOffset, O_T_Length);
                 }
@@ -897,14 +896,22 @@ namespace Sres.Net.EEIP
                         headerOffset = 0;
                     lock (_T_O_IOData_lock)
                     {
-                         Array.Copy(receiveBytes, 20 + headerOffset, _T_O_IOData, 0,
+                        Array.Copy(receiveBytes, 20 + headerOffset, _T_O_IOData, 0,
                             receiveBytes.Length - 20 - headerOffset);
                     }
                     //Console.WriteLine(T_O_IOData[0]);
-
-					OnImplicitMessageReceived(new ImplicitMessageReceivedArgs(connectionID));																		 
+                    Console.WriteLine("Implicit rcv OK.");
+                    OnImplicitMessageReceived(new ImplicitMessageReceivedArgs(connectionID));
 
                 }
+                else
+                {
+                    Console.WriteLine("Implicit rcv wrong ID. Expected: " + connectionID_T_O + " Received: " + connectionID);
+                }
+            }
+            else
+            {
+                Console.WriteLine("Implicit rcv too short: " + receiveBytes.Length);
             }
             LastReceivedImplicitMessage = DateTime.Now;
         }
@@ -1289,6 +1296,7 @@ namespace Sres.Net.EEIP
                 }
 
             return data.ToArray();
+
         }
 
         /// <summary>
@@ -1405,7 +1413,7 @@ namespace Sres.Net.EEIP
         {
             ImplicitMessageReceived?.Invoke(this, e);
         }
-		
+
         /// <summary>
         /// Converts a bytearray (received e.g. via getAttributeSingle) to ushort
         /// </summary>

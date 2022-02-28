@@ -13,6 +13,9 @@ namespace DiscoverDevices
             Sres.Net.EEIP.EEIPClient eipClient = new Sres.Net.EEIP.EEIPClient();
             List<Sres.Net.EEIP.Encapsulation.CIPIdentityItem> cipIdentityItem = eipClient.ListIdentity();
 
+            if (cipIdentityItem.Count == 0)
+                Console.WriteLine("No Ethernet/IP Device Found");
+
             for (int i = 0; i < cipIdentityItem.Count; i++)
             {
                 Console.WriteLine("Ethernet/IP Device Found:");
